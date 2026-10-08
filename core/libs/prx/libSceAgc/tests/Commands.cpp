@@ -13,6 +13,8 @@
 extern "C" std::uint32_t* APS5_VABI sceAgcDcbResetQueue(CommandBuffer* buf, std::uint32_t op, std::uint32_t state);
 extern "C" std::uint32_t* APS5_VABI sceAgcDcbClearState(CommandBuffer* buf, std::uint32_t command);
 extern "C" std::uint32_t* APS5_VABI sceAgcDcbSetFlip(CommandBuffer* buf, std::uint32_t handle, std::int32_t index, std::uint32_t mode, std::int64_t argument);
+extern "C" std::uint32_t* APS5_VABI sceAgcAcbSetFlip(CommandBuffer* buf, std::uint32_t handle, std::int32_t index, std::uint32_t mode, std::int64_t argument);
+extern "C" std::uint32_t* APS5_VABI sceAgcAcbWaitUntilSafeForRendering(CommandBuffer* buf, std::uint32_t handle, std::uint32_t index);
 extern "C" int APS5_VABI sceAgcSuspendPoint();
 extern "C" int APS5_VABI sceAgcInit(std::uint32_t version);
 extern "C" void* APS5_VABI sceAgcGetRegisterDefaults();
@@ -283,6 +285,12 @@ void testFlip() {
     exhausted.buffer.cursor_down = exhausted.words.data() + 5;
     expectFailure([&] { sceAgcDcbSetFlip(&exhausted.buffer, 1, 0, 1, 0); });
     check(exhausted.buffer.cursor_up == exhausted.words.data(), "failed flip allocation advanced cursor");
+    Storage compute;
+    auto* wait = sceAgcAcbWaitUntilSafeForRendering(&compute.buffer, 0xfedcba98u, 3);
+    auto* computeFlip = sceAgcAcbSetFlip(&compute.buffer, 0xfedcba98u, -2, 0x12345678u, -0x123456789abcdefLL);
+    const std::array<std::uint32_t, 4> expectedWait{0xc0021018u, 0xfedcba98u, 3, 0};
+    check(wait == compute.words.data() && std::equal(expectedWait.begin(), expectedWait.end(), wait), "ACB rendering wait packet mismatch");
+    check(computeFlip == wait + 4 && std::equal(expected.begin(), expected.end(), computeFlip), "ACB flip packet differs from the DCB flip");
     check(sceAgcSuspendPoint() == 0, "empty suspend failed");
 }
 

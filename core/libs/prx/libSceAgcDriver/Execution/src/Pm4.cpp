@@ -237,14 +237,14 @@ void Validate(std::span<const std::uint32_t> packet, std::uint32_t queue) {
                 require((packet[1] & 0xffff0000u) != 0x68750000u, "typed user-data and legacy flip markers are not implemented");
                 break;
             case 0x09: size(2); break;
-            case 0x06: graphics(); size(4); require(packet[3] == 0, "unsupported rendering wait mode"); break;
+            case 0x06: size(4); require(packet[3] == 0, "unsupported rendering wait mode"); break;
             case 0x0b: {
                 const auto data = std::as_bytes(packet.subspan(1));
                 require(std::find(data.begin(), data.end(), std::byte{}) != data.end(), "unterminated marker text");
                 break;
             }
             case 0x0c: break;
-            case 0x17: graphics(); size(6); break;
+            case 0x17: size(6); break;
             case 0x1a:
                 graphics();
                 require(packet.size() == 3 || packet.size() == 5, "invalid context-state packet size");
