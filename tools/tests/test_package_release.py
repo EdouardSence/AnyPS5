@@ -43,6 +43,7 @@ class ReleasePackageTests(unittest.TestCase):
         libraries.mkdir(parents=True)
         self.library = libraries / "libc.prx"
         self.library.write_bytes(b"library bytes")
+        (libraries / "libmimalloc.so").write_bytes(b"allocator bytes")
         binary = self.build / "core/relinker/relinker"
         binary.parent.mkdir(parents=True)
         binary.write_bytes(b"relinker bytes")
@@ -113,6 +114,8 @@ class ReleasePackageTests(unittest.TestCase):
                 client.write_bytes(platform.encode() + b" Tracy client")
                 cache = "APS5_ENABLE_TRACY:BOOL=ON\n"
                 expected = {"libs/libc.prx", "libs/" + name}
+                if platform == "linux":
+                    expected.add("libs/libmimalloc.so")
                 if platform == "windows":
                     runtime = self.root / "toolchain"
                     runtime.mkdir()
@@ -142,7 +145,7 @@ class ReleasePackageTests(unittest.TestCase):
                 output = self.output / str(index)
                 package_release.package("linux", self.build, output, "v1")
                 with zipfile.ZipFile(output / "prx-linux-v1.zip") as archive:
-                    self.assertEqual(archive.namelist(), ["libs/libc.prx"])
+                    self.assertEqual(archive.namelist(), ["libs/libc.prx", "libs/libmimalloc.so"])
 
     def test_missing_or_ambiguous_tracy_client_preserves_existing_assets(self):
         (self.build / "CMakeCache.txt").write_text("APS5_ENABLE_TRACY:BOOL=ON\n", encoding="utf-8")
@@ -170,19 +173,25 @@ class ReleasePackageTests(unittest.TestCase):
         with working_directory(self.source):
             package_release.package("linux", self.build, self.output, "v1.0")
         with zipfile.ZipFile(self.output / "prx-linux-v1.0.zip") as archive:
-            self.assertEqual(archive.namelist(), ["libs/libc.prx"])
+            self.assertEqual(archive.namelist(), ["libs/libc.prx", "libs/libmimalloc.so"])
 
     def test_removed_libraries_are_not_packaged_from_a_reused_build(self):
         stale = self.library.with_name("libRemoved.prx")
         stale.write_bytes(b"obsolete library")
         package_release.package("linux", self.build, self.output, "v1.0")
         with zipfile.ZipFile(self.output / "prx-linux-v1.0.zip") as archive:
-            self.assertEqual(archive.namelist(), ["libs/libc.prx"])
+            self.assertEqual(archive.namelist(), ["libs/libc.prx", "libs/libmimalloc.so"])
             self.assertEqual(archive.read("libs/libc.prx"), b"library bytes")
         with tarfile.open(self.output / "prx-linux-v1.0.tar.gz") as archive:
-            self.assertEqual(archive.getnames(), ["libs/libc.prx"])
+            self.assertEqual(archive.getnames(), ["libs/libc.prx", "libs/libmimalloc.so"])
             self.assertEqual(archive.extractfile("libs/libc.prx").read(), b"library bytes")
+            self.assertEqual(archive.extractfile("libs/libmimalloc.so").read(), b"allocator bytes")
         self.assertEqual(stale.read_bytes(), b"obsolete library")
+
+    def test_linux_package_requires_mimalloc(self):
+        (self.build / "core/libs/libs/libmimalloc.so").unlink()
+        with self.assertRaisesRegex(RuntimeError, "libmimalloc.so"):
+            package_release.package("linux", self.build, self.output, "v1")
 
     def test_tar_and_zip_include_the_same_symlink_contents(self):
         target = self.library.with_name("libc.target")
@@ -426,6 +435,7 @@ class ReleaseAssetsTests(unittest.TestCase):
             build = root / "build"
             (build / "core/libs/libs").mkdir(parents=True)
             (build / "core/libs/libs/libc.prx").write_bytes(b"new library")
+            (build / "core/libs/libs/libmimalloc.so").write_bytes(b"new allocator")
             (build / "core/relinker").mkdir(parents=True)
             (build / "core/relinker/relinker").write_bytes(b"new executable")
             output = root / "assets"

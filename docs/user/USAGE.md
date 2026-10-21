@@ -186,6 +186,8 @@ Linux:
 ./app.elf
 ```
 
+To allocate through mimalloc instead of glibc's allocator, start it with `LD_PRELOAD="$PWD/libs/libmimalloc.so" ./app.elf`. A self-built `libs/` takes `libmimalloc.so` from `build/core/libs/libs/`.
+
 The relinker writes `app.elf` and each `Executable file:` it lists with execute permission. A copy that lost its file mode, such as a browser download, needs `chmod +x` on each of them first; without it a title that starts another executable stops with `sceSystemServiceLoadExec: execv failed: Permission denied`.
 
 Windows PowerShell:

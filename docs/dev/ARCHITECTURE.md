@@ -70,6 +70,12 @@ On Windows, a relinked game run with `APS5_MIMALLOC` set (to any value) allocate
   - After the redirection these calls would enter mimalloc again, before the calling thread's mimalloc state exists.
   - Linker wraps send them to [`RuntimeHeap.c`](../../core/libs/allocator/RuntimeHeap.c), which allocates from the process heap (`HeapAlloc` on `GetProcessHeap()`). The same code frees these blocks through the same wraps.
 
+## Linux allocator
+
+On Linux, the build copies `libmimalloc.so`, [mimalloc](../../3rdparty/mimalloc) built with `MI_OVERRIDE`, beside the libraries ([`core/libs/CMakeLists.txt`](../../core/libs/CMakeLists.txt)). A game started with `LD_PRELOAD` naming it allocates through mimalloc: the dynamic linker binds `malloc`, `free` and the C++ allocation operators of the executable and of every library to it. Without the variable the process keeps glibc's allocator.
+
+- Guest code allocates through libc's guest heap, as on Windows.
+
 ## Thread cancellation
 
 [`Thread.cpp`](../../core/libs/prx/libkernel/Pthread/src/Thread.cpp) records cancellation requests on the target guest thread. New threads start with cancellation enabled and deferred. A disabled request stays pending; enabling deferred cancellation returns before the next cancellation point acts on it. Repeated requests do not add cleanup invocations.
